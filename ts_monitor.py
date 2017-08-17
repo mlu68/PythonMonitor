@@ -1,7 +1,7 @@
 
 # coding: utf-8
 
-# In[2]:
+# In[1]:
 
 import pandas as pd
 import numpy as np
@@ -20,7 +20,7 @@ plt.style.use('bmh')
 
 # # Generate time series
 
-# In[20]:
+# In[2]:
 
 from statsmodels.tsa.arima_process import arma_generate_sample
 
@@ -39,7 +39,7 @@ ax.plot(x1, y, label="Data")
 
 # # Decomposition plot
 
-# In[21]:
+# In[3]:
 
 serie =  pd.DataFrame(y)
 serie.index = pd.DatetimeIndex(freq='w', start=0, periods=nsample)
@@ -55,7 +55,7 @@ plt.show()
 
 # # ARIMA modeling
 
-# In[22]:
+# In[4]:
 
 # Define the p, d and q parameters to take any value between 0 and 2
 p = d = q = range(0, 2)
@@ -69,7 +69,7 @@ seasonal_pdq = [(x[0], x[1], x[2], 12) for x in list(itertools.product(p, d, q))
 
 # ## Select model
 
-# In[27]:
+# In[5]:
 
 import sys
 warnings.filterwarnings("ignore") # specify to ignore warning messages
@@ -105,7 +105,7 @@ print("Best SARIMAX{}x{}12 model - AIC:{}".format(best_pdq, best_seasonal_pdq, b
 
 # ## Model
 
-# In[33]:
+# In[6]:
 
 best_model = sm.tsa.statespace.SARIMAX(serie,
                                       order=best_pdq,
@@ -117,4 +117,70 @@ best_results = best_model.fit()
 
 print(best_results.summary().tables[0])
 print(best_results.summary().tables[1])
+
+
+# In[7]:
+
+predicted = best_results.get_prediction(start=0, dynamic=False, full_results=True)
+
+
+# In[8]:
+
+plt.figure(figsize=(20,15))
+plt.plot(predicted.predicted_mean, color = 'b', label = 'Smoothed')
+plt.plot(serie, color = 'r', label = 'Original data')
+plt.legend(loc='upper left')
+
+
+# ## Errors
+
+# In[9]:
+
+best_results.plot_diagnostics(lags=30, figsize=(16,12))
+
+
+# In[10]:
+
+errors = pd.DataFrame(columns=['SERIE','PREDICTED'])
+errors['SERIE'] = np.reshape(serie[0], len(serie[0]))
+errors['PREDICTED'] = predicted.predicted_mean
+errors['ERRORS'] = errors['SERIE'] - errors['PREDICTED']
+
+
+# # Control
+
+# ## Control limits
+
+# In[13]:
+
+dev = errors['ERRORS'].std()
+
+
+# In[59]:
+
+nsgimas = 2
+
+up = errors['PREDICTED'] + dev * nsgimas
+low = errors['PREDICTED'] - dev * nsgimas
+
+
+# In[60]:
+
+ooc = np.where((errors['SERIE'] > up) | (errors['SERIE'] < low))
+print(ooc)
+
+
+# In[61]:
+
+plt.figure(figsize=(25,15))
+
+errors['SERIE'].iloc[ooc]
+
+plt.figure(figsize=(15,12))
+plt.plot(up, color = 'r', label = 'upper')
+plt.plot(low, color = 'r', label = 'lower')
+plt.plot(errors['SERIE'])
+
+plt.plot(errors.index[ooc], errors['SERIE'].iloc[ooc], 'ro', markersize  = 10, label = "out of control")
+plt.legend(loc='upper left', fontsize = 'x-large')
 
